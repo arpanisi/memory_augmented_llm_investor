@@ -62,13 +62,21 @@ def test_baselines_attribution():
     # Equal weight 2% daily return for both assets -> 2% daily portfolio return
     assert ew_rets.iloc[0] == pytest.approx(0.02)
 
-def test_tier1_orchestration_run():
+def test_tier1_orchestration_run(monkeypatch):
     """Smoke test running Tier 1 daily loop across 3 assets and 3 days."""
-    orchestrator = DailyOrchestrator(model_id="openai/gpt-4o-mini", risk_aversion_lambda=1.0)
-    orchestrator.assets = ["AAPL", "BTC-USD", "SPY"]
-    
+    import src.orchestrator as orch_mod
+    orch = DailyOrchestrator(model_id="openai/gpt-4o-mini", risk_aversion_lambda=1.0)
+    orch.assets = ["AAPL", "BTC-USD", "SPY"]
+    dates = [d.strftime("%Y-%m-%d") for d in pd.bdate_range("2015-01-01", periods=800)]
+    price_pivot = pd.DataFrame(100.0, index=dates, columns=["AAPL", "BTC-USD", "SPY"])
+    monkeypatch.setattr(orch_mod, "get_pivot_close_prices", lambda *args, **kwargs: price_pivot)
+    monkeypatch.setattr(orch_mod, "compute_barra_model", lambda p, t: (pd.DataFrame(), {}))
+    monkeypatch.setattr(orch_mod, "compute_asset_factor_exposures", lambda *a, **k: np.zeros((3, 14)))
+    monkeypatch.setattr(orch_mod, "call_view_formation_agent",
+                        lambda **kw: {"direction": "flat", "conviction": 0.0, "rationale": "test"})
+
     # Run daily loop over short date range
-    df_res = orchestrator.run_daily_loop(start_date="2018-01-02", end_date="2018-01-05", is_warmup=True)
+    df_res = orch.run_daily_loop(start_date="2018-01-02", end_date="2018-01-05", is_warmup=True)
     assert not df_res.empty
     assert "Portfolio_Return" in df_res.columns
     assert "Breadth" in df_res.columns
@@ -227,8 +235,11 @@ def test_orchestrator_wires_relationship_graph_into_view_formation(monkeypatch):
     import src.orchestrator as orch_mod
     orch = DailyOrchestrator(model_id="openai/gpt-4o-mini", risk_aversion_lambda=1.0)
     orch.assets = ["AAPL", "BTC-USD", "SPY"]
-
+    dates = pd.bdate_range("2015-01-01", periods=800).strftime("%Y-%m-%d").tolist()
+    price_pivot = pd.DataFrame(100.0, index=dates, columns=["AAPL", "BTC-USD", "SPY"])
+    monkeypatch.setattr(orch_mod, "get_pivot_close_prices", lambda *args, **kwargs: price_pivot)
     monkeypatch.setattr(orch_mod, "compute_barra_model", lambda p, t: (pd.DataFrame(), {}))
+    monkeypatch.setattr(orch_mod, "compute_asset_factor_exposures", lambda *a, **k: np.zeros((3, 14)))
     synthetic_filing = {
         "cik": "0000320193", "filed": "2018-01-02",
         "accession_number": "0000320193-18-000001", "primary_document": "form10k.htm",
@@ -306,6 +317,9 @@ def test_daily_loop_invokes_cleanup(monkeypatch):
 
     orch = DailyOrchestrator(model_id="openai/gpt-4o-mini", risk_aversion_lambda=1.0)
     orch.assets = ["AAPL", "BTC-USD", "SPY"]
+    dates = pd.bdate_range("2015-01-01", periods=800).strftime("%Y-%m-%d").tolist()
+    price_pivot = pd.DataFrame(100.0, index=dates, columns=["AAPL", "BTC-USD", "SPY"])
+    monkeypatch.setattr(orch_mod, "get_pivot_close_prices", lambda *args, **kwargs: price_pivot)
     monkeypatch.setattr(orch_mod, "compute_barra_model", lambda p, t: (pd.DataFrame(), {}))
     monkeypatch.setattr(orch_mod, "compute_asset_factor_exposures",
                         lambda *a, **k: np.zeros((3, 14)))

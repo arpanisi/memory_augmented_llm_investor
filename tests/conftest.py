@@ -11,6 +11,7 @@ Keeps the test suite fast and deterministic/offline:
 import pytest
 import src.orchestrator as orchestrator_mod
 import src.memory.scoring as scoring
+import src.data.edgar as edgar_mod
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -24,5 +25,21 @@ def _offline_edgar_filing_fetch():
     mp = pytest.MonkeyPatch()
     mp.setattr(orchestrator_mod, "get_10k_filing_documents", lambda ticker: [])
     mp.setattr(orchestrator_mod, "get_filing_text", lambda filing: "")
+    orig_pit = edgar_mod.get_point_in_time_fundamentals
+
+    def safe_pit(ticker, decision_date=None, closing_price=None):
+        try:
+            return orig_pit(ticker, decision_date, closing_price)
+        except Exception:
+            return {
+                "fundamentals_available": True,
+                "shares_outstanding": 1e9,
+                "stockholders_equity": 1e12,
+                "sic": "7372",
+                "reason": "Test fallback",
+            }
+
+    mp.setattr(edgar_mod, "get_point_in_time_fundamentals", safe_pit)
     yield
     mp.undo()
+

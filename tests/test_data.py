@@ -46,8 +46,11 @@ def test_sic_division_mapping():
     assert get_sic_division("7372") == "I"
     assert get_sic_division("9100") == "J"
 
-def test_price_pivot_structure():
+def test_price_pivot_structure(monkeypatch, tmp_path):
     """Verify pivot table format and date alignment."""
+    import src.data.prices as prices_mod
+    dates = [d.strftime("%Y-%m-%d") for d in pd.date_range("2020-01-01", "2020-01-31", freq="B")]
+    _write_price_cache(monkeypatch, tmp_path, ["AAPL", "BTC-USD", "SPY"], dates)
     tickers = ["AAPL", "BTC-USD", "SPY"]
     pivot = get_pivot_close_prices(tickers, start_date="2020-01-01", end_date="2020-01-31")
     assert not pivot.empty
