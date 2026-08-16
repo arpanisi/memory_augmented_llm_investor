@@ -1,0 +1,8 @@
+description: "Memory-augmented LLM portfolio management with Barra-style risk-model optimization, evaluated against Yahoo Finance prices and SEC EDGAR fundamentals."
+topics:
+- llm-agents
+- vector-memory
+- barra-risk-model
+- ledoit-wolf-shrinkage
+- convex-optimization
+- portfolio-breadth
