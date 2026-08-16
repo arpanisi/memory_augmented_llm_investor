@@ -7,7 +7,10 @@ Keeps the test suite fast and deterministic/offline:
   2. Stubs the EDGAR 10-K filing text pipeline in the orchestrator so integration runs do not
      download filing documents (the graph wiring itself is exercised via dedicated tests that
      override these stubs with synthetic filings).
-  3. Provides offline fallbacks for external network calls (SEC EDGAR, Ken French RF data, yfinance).
+  3. Stubs the mechanical 300-name estimation universe builder in orchestrator integration runs so
+     tests do not fetch the full 1500-name SEC registry from yfinance/EDGAR unless running the
+     dedicated selection tests in test_estimation_universe.py.
+  4. Provides offline fallbacks for external network calls (SEC EDGAR, Ken French RF data, yfinance).
 """
 import pytest
 import pandas as pd
@@ -30,6 +33,14 @@ def _offline_environment_stubs():
     mp = pytest.MonkeyPatch()
     mp.setattr(orchestrator_mod, "get_10k_filing_documents", lambda ticker: [])
     mp.setattr(orchestrator_mod, "get_filing_text", lambda filing: "")
+    mp.setattr(orchestrator_mod, "build_estimation_universe",
+               lambda size=300: [f"EST{i:03d}" for i in range(size)])
+
+    def default_orch_prices(tickers, start_date="2015-01-01", end_date="2023-12-31", **kw):
+        dates = pd.bdate_range(start_date, end_date).strftime("%Y-%m-%d").tolist()
+        return pd.DataFrame(100.0, index=dates, columns=tickers)
+
+    mp.setattr(orchestrator_mod, "get_pivot_close_prices", default_orch_prices)
 
     orig_pit = edgar_mod.get_point_in_time_fundamentals
 
